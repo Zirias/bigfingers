@@ -9,6 +9,7 @@ DECLRES(src_led_unlit_bmp);
 
 struct context
 {
+    SDL_Window *w;
     SDL_Renderer *r;
     SDL_Texture *unlit;
     SDL_Texture *lit;
@@ -101,7 +102,7 @@ int onClick(struct context *ctx, int x, int y)
 	snprintf(message, 128, "You won in %d moves.\n\n"
 		"Do you want to play again?", ctx->moves);
 	const SDL_MessageBoxData mbox = {SDL_MESSAGEBOX_INFORMATION,
-	    0, "You won!", message, SDL_arraysize(buttons), buttons, 0};
+	    ctx->w, "You won!", message, SDL_arraysize(buttons), buttons, 0};
 	int button;
 	SDL_ShowMessageBox(&mbox, &button);
 	if (button)
@@ -129,8 +130,7 @@ int main(int argc, char **argv)
     (void)argv;
 
     int rc = EXIT_SUCCESS;
-    SDL_Window *w = 0;
-    struct context ctx = {0, 0, 0,
+    struct context ctx = {0, 0, 0, 0,
 	{50,100,150,200,250},
 	{50,100,150,200,250}, {{0}}, 0};
 
@@ -140,16 +140,16 @@ int main(int argc, char **argv)
         return EXIT_FAILURE;
     }
 
-    w = SDL_CreateWindow("BigFingers",
+    ctx.w = SDL_CreateWindow("BigFingers",
                 SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
                 250, 250, SDL_WINDOW_ALLOW_HIGHDPI|SDL_WINDOW_RESIZABLE);
-    if (!w)
+    if (!ctx.w)
     {
         fprintf(stderr, "Error opening window: %s\n", SDL_GetError());
         goto error;
     }
 
-    ctx.r = SDL_CreateRenderer(w, -1, SDL_RENDERER_ACCELERATED);
+    ctx.r = SDL_CreateRenderer(ctx.w, -1, SDL_RENDERER_ACCELERATED);
     if (!ctx.r)
     {
         fprintf(stderr, "Error creating renderer: %s\n", SDL_GetError());
@@ -183,7 +183,6 @@ int main(int argc, char **argv)
     SDL_Event ev;
     while (SDL_WaitEvent(&ev))
     {
-        if (ev.type == SDL_QUIT) goto quit;
         switch (ev.type)
         {
         case SDL_QUIT:
@@ -210,7 +209,7 @@ quit:
     if (ctx.unlit) SDL_DestroyTexture(ctx.unlit);
     if (ctx.lit) SDL_DestroyTexture(ctx.lit);
     if (ctx.r) SDL_DestroyRenderer(ctx.r);
-    if (w) SDL_DestroyWindow(w);
+    if (ctx.w) SDL_DestroyWindow(ctx.w);
     SDL_Quit();
     return rc;
 }
