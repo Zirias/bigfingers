@@ -15,6 +15,7 @@ struct context
     int tx[5];
     int ty[5];
     int board[5][5];
+    int moves;
 };
 
 void draw(const struct context *ctx)
@@ -68,7 +69,7 @@ void toggle(struct context *ctx, int r, int c)
     ctx->board[r][c] = !ctx->board[r][c];
 }
 
-void onClick(struct context *ctx, int x, int y)
+int onClick(struct context *ctx, int x, int y)
 {
     int r = 0;
     while (ctx->ty[r] < y) ++r;
@@ -76,7 +77,50 @@ void onClick(struct context *ctx, int x, int y)
     while (ctx->tx[c] < x) ++c;
 
     toggle(ctx, r, c);
+    ++ctx->moves;
+
+    int won = 1;
+    for (int i = 0; i < 25; ++i)
+    {
+	if (((int *)ctx->board)[i])
+	{
+	    won = 0;
+	    break;
+	}
+    }
+
     draw(ctx);
+
+    if (won)
+    {
+	const SDL_MessageBoxButtonData buttons[] = {
+	    { SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT, 0, "yes" },
+	    { SDL_MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT, 1, "no" }
+	};
+	char message[128];
+	snprintf(message, 128, "You won in %d moves.\n\n"
+		"Do you want to play again?", ctx->moves);
+	const SDL_MessageBoxData mbox = {SDL_MESSAGEBOX_INFORMATION,
+	    0, "You won!", message, SDL_arraysize(buttons), buttons, 0};
+	int button;
+	SDL_ShowMessageBox(&mbox, &button);
+	if (button)
+	{
+	    return 1;
+	}
+	else
+	{
+	    for (int i = 0; i < 128; ++i)
+	    {
+		toggle(ctx, rand()%5, rand()%5);
+	    }
+	    ctx->moves = 0;
+	    draw(ctx);
+	    return 0;
+	}
+    }
+
+    return 0;
 }
 
 int main(int argc, char **argv)
@@ -86,7 +130,9 @@ int main(int argc, char **argv)
 
     int rc = EXIT_SUCCESS;
     SDL_Window *w = 0;
-    struct context ctx = {0,0,0,{50,100,150,200,250},{50,100,150,200,250},{{0}}};
+    struct context ctx = {0, 0, 0,
+	{50,100,150,200,250},
+	{50,100,150,200,250}, {{0}}, 0};
 
     if (SDL_Init(SDL_INIT_VIDEO) != 0)
     {
@@ -150,7 +196,10 @@ int main(int argc, char **argv)
         case SDL_MOUSEBUTTONDOWN:
             if (ev.button.button == SDL_BUTTON_LEFT)
             {
-                onClick(&ctx, ev.button.x, ev.button.y);
+		if (onClick(&ctx, ev.button.x, ev.button.y))
+		{
+		    goto quit;
+		}
             }
         }
     }
@@ -158,6 +207,8 @@ int main(int argc, char **argv)
 error:
     rc = EXIT_FAILURE;
 quit:
+    if (ctx.unlit) SDL_DestroyTexture(ctx.unlit);
+    if (ctx.lit) SDL_DestroyTexture(ctx.lit);
     if (ctx.r) SDL_DestroyRenderer(ctx.r);
     if (w) SDL_DestroyWindow(w);
     SDL_Quit();
