@@ -2,15 +2,10 @@
 #include <time.h>
 #include <SDL2/SDL.h>
 
-extern char binary_src_led_lit_bmp_size;
-extern char binary_src_led_lit_bmp_start;
-extern char binary_src_led_unlit_bmp_size;
-extern char binary_src_led_unlit_bmp_start;
+#include "resource.h"
 
-#define led_lit_bmp ((void *)&binary_src_led_lit_bmp_start)
-#define led_lit_bmp_size ((size_t)&binary_src_led_lit_bmp_size)
-#define led_unlit_bmp ((void *)&binary_src_led_unlit_bmp_start)
-#define led_unlit_bmp_size ((size_t)&binary_src_led_unlit_bmp_size)
+DECLRES(src_led_lit_bmp);
+DECLRES(src_led_unlit_bmp);
 
 struct context
 {
@@ -115,12 +110,18 @@ int main(int argc, char **argv)
         goto error;
     }
 
-    SDL_RWops *stream = SDL_RWFromConstMem(led_lit_bmp, led_lit_bmp_size);
+    SDL_RWops *stream = SDL_RWFromConstMem(RESOURCE(src_led_lit_bmp),
+	    RESSIZE(src_led_lit_bmp));
     SDL_Surface *bmp = SDL_LoadBMP_RW(stream, 1);
-    if (!bmp) goto error;
+    if (!bmp)
+    {
+        fprintf(stderr, "Error creating surface: %s\n", SDL_GetError());
+	goto error;
+    }
     ctx.lit = SDL_CreateTextureFromSurface(ctx.r, bmp);
     SDL_FreeSurface(bmp);
-    stream = SDL_RWFromConstMem(led_unlit_bmp, led_unlit_bmp_size);
+    stream = SDL_RWFromConstMem(RESOURCE(src_led_unlit_bmp),
+	    RESSIZE(src_led_unlit_bmp));
     bmp = SDL_LoadBMP_RW(stream, 1);
     if (!bmp) goto error;
     ctx.unlit = SDL_CreateTextureFromSurface(ctx.r, bmp);
