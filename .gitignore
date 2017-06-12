@@ -1,0 +1,11 @@
+bin/
+lib/
+obj/
+.*.swp
+.*.cfg
+*.config
+*.creator
+*.user
+*.files
+*.includes
+
