@@ -216,6 +216,7 @@ int main(int argc, char **argv)
             RESSIZE(src_finger_bmp));
     bmp = SDL_LoadBMP_RW(stream, 1);
     if (!bmp) goto error;
+    SDL_SetColorKey(bmp, SDL_TRUE, 0xff00);
     ctx.finger = SDL_CreateTextureFromSurface(ctx.r, bmp);
     SDL_FreeSurface(bmp);
     SDL_SetTextureBlendMode(ctx.finger, SDL_BLENDMODE_BLEND);
