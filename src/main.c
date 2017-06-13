@@ -6,6 +6,14 @@
 
 DECLRES(src_led_lit_bmp);
 DECLRES(src_led_unlit_bmp);
+DECLRES(src_finger_bmp);
+
+enum fingerstate
+{
+    FS_HIDDEN,
+    FS_BLEND,
+    FS_SOLID
+};
 
 struct context
 {
@@ -13,13 +21,16 @@ struct context
     SDL_Renderer *r;
     SDL_Texture *unlit;
     SDL_Texture *lit;
+    SDL_Texture *finger;
     int tx[5];
     int ty[5];
     int board[5][5];
     int moves;
+    enum fingerstate fingerstate;
+    int fingerpos[2];
 };
 
-void draw(const struct context *ctx)
+static void draw(const struct context *ctx)
 {
     SDL_Rect dst;
     SDL_RenderClear(ctx->r);
@@ -35,10 +46,26 @@ void draw(const struct context *ctx)
                         0, &dst);
         }
     }
+    if (ctx->fingerstate != FS_HIDDEN)
+    {
+        if (ctx->fingerstate == FS_BLEND)
+        {
+            SDL_SetTextureAlphaMod(ctx->finger, 0xc0);
+        }
+        else
+        {
+            SDL_SetTextureAlphaMod(ctx->finger, 0xff);
+        }
+        dst.w = ctx->tx[0] * 2;
+        dst.h = ctx->tx[0] * 2;
+        dst.x = ctx->fingerpos[0];
+        dst.y = ctx->fingerpos[1];
+        SDL_RenderCopy(ctx->r, ctx->finger, 0, &dst);
+    }
     SDL_RenderPresent(ctx->r);
 }
 
-void onResized(struct context *ctx, int width, int height)
+static void onResized(struct context *ctx, int width, int height)
 {
     int sx = width / 5;
     int mx = width % 5;
@@ -59,7 +86,23 @@ void onResized(struct context *ctx, int width, int height)
     }
 }
 
-void toggle(struct context *ctx, int r, int c)
+static void onMouseMove(struct context *ctx, int x, int y)
+{
+    int ox = 6 * ctx->tx[0] / 5;
+    int oy = 6 * ctx->ty[0] / 5;
+
+    int c = 0;
+    while (ctx->tx[c] < x) ++c;
+    ox += (ctx->tx[c] - x) / 3;
+    int r = 0;
+    while (ctx->ty[r] < y) ++r;
+    oy += (ctx->ty[r] - y) / 3;
+
+    ctx->fingerpos[0] = ctx->tx[c] - ox;
+    ctx->fingerpos[1] = ctx->ty[r] - oy;
+}
+
+static void toggle(struct context *ctx, int r, int c)
 {
     if (r > 0) ctx->board[r-1][c] = !ctx->board[r-1][c];
     if (r < 4) ctx->board[r+1][c] = !ctx->board[r+1][c];
@@ -68,7 +111,7 @@ void toggle(struct context *ctx, int r, int c)
     ctx->board[r][c] = !ctx->board[r][c];
 }
 
-int onClick(struct context *ctx, int x, int y)
+static int onClick(struct context *ctx, int x, int y)
 {
     int r = 0;
     while (ctx->ty[r] < y) ++r;
@@ -128,9 +171,9 @@ int main(int argc, char **argv)
     (void)argv;
 
     int rc = EXIT_SUCCESS;
-    struct context ctx = {0, 0, 0, 0,
+    struct context ctx = {0, 0, 0, 0, 0,
 	{50,100,150,200,250},
-	{50,100,150,200,250}, {{0}}, 0};
+	{50,100,150,200,250}, {{0}}, 0, 0, {0}};
 
     if (SDL_Init(SDL_INIT_VIDEO) != 0)
     {
@@ -147,6 +190,9 @@ int main(int argc, char **argv)
         goto error;
     }
 
+    SDL_ShowCursor(SDL_DISABLE);
+    SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "1");
+
     ctx.r = SDL_CreateRenderer(ctx.w, -1, SDL_RENDERER_ACCELERATED);
     if (!ctx.r)
     {
@@ -157,11 +203,7 @@ int main(int argc, char **argv)
     SDL_RWops *stream = SDL_RWFromConstMem(RESOURCE(src_led_lit_bmp),
 	    RESSIZE(src_led_lit_bmp));
     SDL_Surface *bmp = SDL_LoadBMP_RW(stream, 1);
-    if (!bmp)
-    {
-        fprintf(stderr, "Error creating surface: %s\n", SDL_GetError());
-	goto error;
-    }
+    if (!bmp) goto error;
     ctx.lit = SDL_CreateTextureFromSurface(ctx.r, bmp);
     SDL_FreeSurface(bmp);
     stream = SDL_RWFromConstMem(RESOURCE(src_led_unlit_bmp),
@@ -170,6 +212,13 @@ int main(int argc, char **argv)
     if (!bmp) goto error;
     ctx.unlit = SDL_CreateTextureFromSurface(ctx.r, bmp);
     SDL_FreeSurface(bmp);
+    stream = SDL_RWFromConstMem(RESOURCE(src_finger_bmp),
+            RESSIZE(src_finger_bmp));
+    bmp = SDL_LoadBMP_RW(stream, 1);
+    if (!bmp) goto error;
+    ctx.finger = SDL_CreateTextureFromSurface(ctx.r, bmp);
+    SDL_FreeSurface(bmp);
+    SDL_SetTextureBlendMode(ctx.finger, SDL_BLENDMODE_BLEND);
 
     srand(time(0));
     for (int i = 0; i < 128; ++i)
@@ -194,20 +243,41 @@ int main(int argc, char **argv)
 	    {
 		draw(&ctx);
 	    }
+            else if (ev.window.event == SDL_WINDOWEVENT_LEAVE)
+            {
+                ctx.fingerstate = FS_HIDDEN;
+                draw(&ctx);
+            }
+            break;
         case SDL_MOUSEBUTTONDOWN:
             if (ev.button.button == SDL_BUTTON_LEFT)
             {
+                ctx.fingerstate = FS_SOLID;
 		if (onClick(&ctx, ev.button.x, ev.button.y))
 		{
 		    goto quit;
 		}
             }
+            break;
+        case SDL_MOUSEBUTTONUP:
+            if (ev.button.button == SDL_BUTTON_LEFT)
+            {
+                ctx.fingerstate = FS_BLEND;
+                draw(&ctx);
+            }
+            break;
+        case SDL_MOUSEMOTION:
+            ctx.fingerstate = FS_BLEND;
+            onMouseMove(&ctx, ev.motion.x, ev.motion.y);
+            draw(&ctx);
+            break;
         }
     }
 
 error:
     rc = EXIT_FAILURE;
 quit:
+    if (ctx.finger) SDL_DestroyTexture(ctx.finger);
     if (ctx.unlit) SDL_DestroyTexture(ctx.unlit);
     if (ctx.lit) SDL_DestroyTexture(ctx.lit);
     if (ctx.r) SDL_DestroyRenderer(ctx.r);
