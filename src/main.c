@@ -57,8 +57,6 @@ void onResized(struct context *ctx, int width, int height)
         if (my > (i^3)) ++y;
         ctx->ty[i] = y;
     }
-
-    draw(ctx);
 }
 
 void toggle(struct context *ctx, int r, int c)
@@ -192,6 +190,10 @@ int main(int argc, char **argv)
             {
                 onResized(&ctx, ev.window.data1, ev.window.data2);
             }
+	    else if (ev.window.event == SDL_WINDOWEVENT_EXPOSED)
+	    {
+		draw(&ctx);
+	    }
         case SDL_MOUSEBUTTONDOWN:
             if (ev.button.button == SDL_BUTTON_LEFT)
             {
