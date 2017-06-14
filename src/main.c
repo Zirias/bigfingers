@@ -251,6 +251,7 @@ int main(int argc, char **argv)
             }
             break;
         case SDL_MOUSEBUTTONDOWN:
+            if (ev.button.which == SDL_TOUCH_MOUSEID) break;
             if (ev.button.button == SDL_BUTTON_LEFT)
             {
                 ctx.fingerstate = FS_SOLID;
@@ -261,6 +262,7 @@ int main(int argc, char **argv)
             }
             break;
         case SDL_MOUSEBUTTONUP:
+            if (ev.button.which == SDL_TOUCH_MOUSEID) break;
             if (ev.button.button == SDL_BUTTON_LEFT)
             {
                 ctx.fingerstate = FS_BLEND;
@@ -268,9 +270,27 @@ int main(int argc, char **argv)
             }
             break;
         case SDL_MOUSEMOTION:
+            if (ev.motion.which == SDL_TOUCH_MOUSEID) break;
             ctx.fingerstate = FS_BLEND;
             onMouseMove(&ctx, ev.motion.x, ev.motion.y);
             draw(&ctx);
+            break;
+        case SDL_FINGERDOWN:
+        case SDL_FINGERMOTION:
+            ctx.fingerstate = FS_BLEND;
+            onMouseMove(&ctx,
+                    (int)(ev.tfinger.x * ctx.tx[4]),
+                    (int)(ev.tfinger.y * ctx.ty[4]));
+            draw(&ctx);
+            break;
+        case SDL_FINGERUP:
+            ctx.fingerstate = FS_HIDDEN;
+            if (onClick(&ctx,
+                        (int)(ev.tfinger.x * ctx.tx[4]),
+                        (int)(ev.tfinger.y * ctx.ty[4])))
+            {
+                goto quit;
+            }
             break;
         }
     }
