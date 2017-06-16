@@ -6,3 +6,15 @@ bigfingers_win32_LDFLAGS := -static-libgcc -mwindows
 
 $(call binrules,bigfingers)
 
+bigfingers_PACKEDDIR:= $(bigfingers_TGTDIR)$(PSEP)packed
+bigfingers_PACKEDEXE:= $(bigfingers_PACKEDDIR)$(PSEP)$(bigfingers_TARGET)$(EXE)
+
+$(bigfingers_PACKEDEXE): $(bigfingers_EXE) | $(bigfingers_PACKEDDIR) strip
+	$(UPX) $(UPXFLAGS) -o$@ $<
+
+pack:: $(bigfingers_PACKEDEXE)
+
+ifeq ($(filter pack,$(MAKECMDGOALS)),pack)
+OUTFILES:=$(bigfingers_PACKEDEXE)
+$(eval $(DIRRULES))
+endif
